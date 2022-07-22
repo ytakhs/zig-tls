@@ -17,23 +17,43 @@ const ClientHelloHandshake = struct {
 const ClientHello = struct {
     const Self = @This();
 
-    pub fn decode(raw: []const u8) ClientHelloHandshake {
-        const handshake_type = @intToEnum(HandshakeType, raw[0]);
-        const length = std.mem.readIntSliceBig(u24, raw[1..4]);
-        const protocol_version = std.mem.readIntSliceBig(u16, raw[4..6]);
-        const random = std.mem.readIntSliceBig(u32, raw[6..10]);
-        const session_id_length = raw[10];
-        const session_id = std.mem.readIntSliceBig(u32, raw[11 .. 11 + session_id_length / 8]);
+    pub const Decoder = struct {
+        cur: usize,
+        raw: []const u8,
 
-        return .{
-            .handshake_type = handshake_type,
-            .length = length,
-            .protocol_version = protocol_version,
-            .random = random,
-            .session_id_length = session_id_length,
-            .session_id = session_id,
-        };
-    }
+        pub fn init(raw: []const u8) Decoder {
+            return .{
+                .cur = 0,
+                .raw = raw,
+            };
+        }
+
+        pub fn decode(self: *Decoder) ClientHelloHandshake {
+            const handshake_type = @intToEnum(HandshakeType, self.readIntBig(u8, 1));
+            const length = self.readIntBig(u24, 3);
+            const protocol_version = self.readIntBig(u16, 2);
+            const random = self.readIntBig(u32, 4);
+            const session_id_length = self.readIntBig(u8, 1);
+            const session_id = self.readIntBig(u32, 4); // TODO
+
+            return .{
+                .handshake_type = handshake_type,
+                .length = length,
+                .protocol_version = protocol_version,
+                .random = random,
+                .session_id_length = session_id_length,
+                .session_id = session_id,
+            };
+        }
+
+        fn readIntBig(self: *Decoder, comptime T: type, len: usize) T {
+            const v = std.mem.readIntSliceBig(T, self.raw[self.cur .. self.cur + len]);
+
+            self.cur += len;
+
+            return v;
+        }
+    };
 
     pub const Encoder = struct {
         buf: std.ArrayList(u8),
@@ -100,7 +120,8 @@ test "ClientHello" {
         0x00,
     };
 
-    const handshake = ClientHello.decode(raw);
+    var decoder = ClientHello.Decoder.init(raw);
+    const handshake = decoder.decode();
 
     try testing.expectEqual(handshake.handshake_type, .client_hello);
     try testing.expectEqual(handshake.length, 1048576);
