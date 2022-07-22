@@ -51,12 +51,18 @@ const ClientHello = struct {
 };
 
 test "ClientHello" {
-    const handshake_type = &[_]u8{@enumToInt(HandshakeType.client_hello)};
-    const length = &[_]u8{ 0x10, 0x00, 0x00 };
-    const protocol_version = &[_]u8{ 0x03, 0x03 };
-    const data: []const u8 = handshake_type ++ length ++ protocol_version;
+    const raw = &[_]u8{
+        @enumToInt(HandshakeType.client_hello),
+        // length
+        0x10,
+        0x00,
+        0x00,
+        // protocol version
+        0x03,
+        0x03,
+    };
 
-    const handshake = ClientHello.decode(data);
+    const handshake = ClientHello.decode(raw);
 
     try testing.expectEqual(handshake.handshake_type, .client_hello);
     try testing.expectEqual(handshake.length, 1048576);
@@ -66,5 +72,5 @@ test "ClientHello" {
     defer encoder.deinit();
     const encoded = try encoder.encode();
 
-    try testing.expectEqualSlices(u8, encoded, data);
+    try testing.expectEqualSlices(u8, encoded, raw);
 }
