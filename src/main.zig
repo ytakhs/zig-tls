@@ -50,17 +50,17 @@ const ClientHello = struct {
         pub fn encode(self: *Encoder) ![]const u8 {
             try self.buf.append(@enumToInt(self.handshake.handshake_type));
 
-            var lengthBuf: [3]u8 = undefined;
-            std.mem.writeIntSlice(u24, &lengthBuf, self.handshake.length, .Big);
-            try self.buf.appendSlice(lengthBuf[0..]);
+            var length_buf: [3]u8 = undefined;
+            std.mem.writeIntSlice(u24, &length_buf, self.handshake.length, .Big);
+            try self.buf.appendSlice(length_buf[0..]);
 
-            var protocolVersionBuf: [2]u8 = undefined;
-            std.mem.writeIntSlice(u16, &protocolVersionBuf, self.handshake.protocol_version, .Big);
-            try self.buf.appendSlice(protocolVersionBuf[0..]);
+            var protocol_version_buf: [2]u8 = undefined;
+            std.mem.writeIntSlice(u16, &protocol_version_buf, self.handshake.protocol_version, .Big);
+            try self.buf.appendSlice(protocol_version_buf[0..]);
 
-            var randomBuf: [4]u8 = undefined;
-            std.mem.writeIntSlice(u32, &randomBuf, self.handshake.random, .Big);
-            try self.buf.appendSlice(randomBuf[0..]);
+            var random_buf: [4]u8 = undefined;
+            std.mem.writeIntSlice(u32, &random_buf, self.handshake.random, .Big);
+            try self.buf.appendSlice(random_buf[0..]);
 
             var session_id_buf: [4]u8 = undefined;
             std.mem.writeIntSlice(u32, &session_id_buf, self.handshake.session_id, .Big);
