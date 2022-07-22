@@ -9,6 +9,7 @@ const ClientHelloHandshake = struct {
     handshake_type: HandshakeType,
     length: u24,
     protocol_version: u16,
+    random: u32,
 };
 
 const ClientHello = struct {
@@ -18,8 +19,14 @@ const ClientHello = struct {
         const handshake_type = @intToEnum(HandshakeType, raw[0]);
         const length = std.mem.readIntSliceBig(u24, raw[1..4]);
         const protocol_version = std.mem.readIntSliceBig(u16, raw[4..6]);
+        const random = std.mem.readIntSliceBig(u32, raw[6..10]);
 
-        return .{ .handshake_type = handshake_type, .length = length, .protocol_version = protocol_version };
+        return .{
+            .handshake_type = handshake_type,
+            .length = length,
+            .protocol_version = protocol_version,
+            .random = random,
+        };
     }
 
     pub const Encoder = struct {
@@ -27,7 +34,10 @@ const ClientHello = struct {
         handshake: ClientHelloHandshake,
 
         pub fn init(alloc: std.mem.Allocator, handshake: ClientHelloHandshake) Encoder {
-            return .{ .buf = std.ArrayList(u8).init(alloc), .handshake = handshake };
+            return .{
+                .buf = std.ArrayList(u8).init(alloc),
+                .handshake = handshake,
+            };
         }
 
         pub fn deinit(self: *Encoder) void {
@@ -45,6 +55,10 @@ const ClientHello = struct {
             std.mem.writeIntSlice(u16, &protocolVersionBuf, self.handshake.protocol_version, .Big);
             try self.buf.appendSlice(protocolVersionBuf[0..]);
 
+            var randomBuf: [4]u8 = undefined;
+            std.mem.writeIntSlice(u32, &randomBuf, self.handshake.random, .Big);
+            try self.buf.appendSlice(randomBuf[0..]);
+
             return self.buf.items;
         }
     };
@@ -60,6 +74,11 @@ test "ClientHello" {
         // protocol version
         0x03,
         0x03,
+        // random
+        0x00,
+        0x00,
+        0x00,
+        0x00,
     };
 
     const handshake = ClientHello.decode(raw);
@@ -67,6 +86,7 @@ test "ClientHello" {
     try testing.expectEqual(handshake.handshake_type, .client_hello);
     try testing.expectEqual(handshake.length, 1048576);
     try testing.expectEqual(handshake.protocol_version, 0x0303);
+    try testing.expectEqual(handshake.random, 0x00);
 
     var encoder = ClientHello.Encoder.init(testing.allocator, handshake);
     defer encoder.deinit();
