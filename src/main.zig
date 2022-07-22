@@ -10,6 +10,7 @@ const ClientHelloHandshake = struct {
     length: u24,
     protocol_version: u16,
     random: u32,
+    session_id_length: u8,
     session_id: u32,
 };
 
@@ -21,13 +22,15 @@ const ClientHello = struct {
         const length = std.mem.readIntSliceBig(u24, raw[1..4]);
         const protocol_version = std.mem.readIntSliceBig(u16, raw[4..6]);
         const random = std.mem.readIntSliceBig(u32, raw[6..10]);
-        const session_id = std.mem.readIntSliceBig(u32, raw[10..14]);
+        const session_id_length = raw[10];
+        const session_id = std.mem.readIntSliceBig(u32, raw[11 .. 11 + session_id_length / 8]);
 
         return .{
             .handshake_type = handshake_type,
             .length = length,
             .protocol_version = protocol_version,
             .random = random,
+            .session_id_length = session_id_length,
             .session_id = session_id,
         };
     }
@@ -62,9 +65,11 @@ const ClientHello = struct {
             std.mem.writeIntSlice(u32, &random_buf, self.handshake.random, .Big);
             try self.buf.appendSlice(random_buf[0..]);
 
+            try self.buf.append(self.handshake.session_id_length);
+
             var session_id_buf: [4]u8 = undefined;
             std.mem.writeIntSlice(u32, &session_id_buf, self.handshake.session_id, .Big);
-            try self.buf.appendSlice(session_id_buf[0..]);
+            try self.buf.appendSlice(session_id_buf[0 .. self.handshake.session_id_length / 8]);
 
             return self.buf.items;
         }
@@ -86,6 +91,8 @@ test "ClientHello" {
         0x00,
         0x00,
         0x00,
+        // session_id_length
+        0x20,
         // session_id
         0x00,
         0x00,
@@ -99,6 +106,7 @@ test "ClientHello" {
     try testing.expectEqual(handshake.length, 1048576);
     try testing.expectEqual(handshake.protocol_version, 0x0303);
     try testing.expectEqual(handshake.random, 0x00);
+    try testing.expectEqual(handshake.session_id_length, 32);
     try testing.expectEqual(handshake.session_id, 0x00);
 
     var encoder = ClientHello.Encoder.init(testing.allocator, handshake);
