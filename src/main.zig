@@ -14,6 +14,8 @@ const ClientHelloHandshake = struct {
     session_id: []const u8,
     cipher_suites_length: u16,
     cipher_suites: []const u8,
+    compression_methods_length: u8,
+    compression_methods: []const u8,
 };
 
 const ClientHello = struct {
@@ -39,6 +41,8 @@ const ClientHello = struct {
             const session_id = self.readSlice(session_id_length);
             const cipher_suites_length = self.readIntBig(u16, 2);
             const cipher_suites = self.readSlice(cipher_suites_length);
+            const compression_methods_length = self.readIntBig(u8, 1);
+            const compression_methods = self.readSlice(compression_methods_length);
 
             return .{
                 .handshake_type = handshake_type,
@@ -49,6 +53,8 @@ const ClientHello = struct {
                 .session_id = session_id,
                 .cipher_suites_length = cipher_suites_length,
                 .cipher_suites = cipher_suites,
+                .compression_methods_length = compression_methods_length,
+                .compression_methods = compression_methods,
             };
         }
 
@@ -107,6 +113,9 @@ const ClientHello = struct {
             std.mem.writeIntSlice(u16, &cipher_suites_length_buf, self.handshake.cipher_suites_length, .Big);
             try self.buf.appendSlice(cipher_suites_length_buf[0..]);
             try self.buf.appendSlice(self.handshake.cipher_suites[0..self.handshake.cipher_suites_length]);
+            // compression_methods
+            try self.buf.append(self.handshake.compression_methods_length);
+            try self.buf.appendSlice(self.handshake.compression_methods[0..self.handshake.compression_methods_length]);
 
             return self.buf.items;
         }
@@ -136,6 +145,12 @@ test "ClientHello" {
     const cipher_suites = &[_]u8{
         0x00, 0x9c,
     };
+    const compression_methods_length = &[_]u8{
+        0x01,
+    };
+    const compression_methods = &[_]u8{
+        0x00,
+    };
     const raw =
         handshake_type ++
         length ++
@@ -144,7 +159,9 @@ test "ClientHello" {
         session_id_length ++
         sesion_id ++
         cipher_suites_length ++
-        cipher_suites;
+        cipher_suites ++
+        compression_methods_length ++
+        compression_methods;
 
     var decoder = ClientHello.Decoder.init(raw);
     const handshake = decoder.decode();
@@ -157,6 +174,8 @@ test "ClientHello" {
     try testing.expectEqualSlices(u8, handshake.session_id, &[_]u8{0x00} ** 32);
     try testing.expectEqual(handshake.cipher_suites_length, 2);
     try testing.expectEqualSlices(u8, handshake.cipher_suites, &[_]u8{ 0x00, 0x9c });
+    try testing.expectEqual(handshake.compression_methods_length, 1);
+    try testing.expectEqualSlices(u8, handshake.compression_methods, &[_]u8{0x00});
 
     var encoder = ClientHello.Encoder.init(testing.allocator, handshake);
     defer encoder.deinit();
