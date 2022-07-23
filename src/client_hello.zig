@@ -7,7 +7,6 @@ const HandshakeType = enum(u8) {
 
 const ClientHelloHandshake = struct {
     handshake_type: HandshakeType,
-    length: u24,
     protocol_version: u16,
     random: u32,
     session_id_length: u8,
@@ -16,6 +15,17 @@ const ClientHelloHandshake = struct {
     cipher_suites: []const u8,
     compression_methods_length: u8,
     compression_methods: []const u8,
+
+    pub fn length(self: *ClientHelloHandshake) u24 {
+        var len: u24 = 0;
+
+        len += (16 + 32 + 8 + 16 + 8) / 8;
+        len += @intCast(u24, self.session_id.len);
+        len += @intCast(u24, self.cipher_suites.len);
+        len += @intCast(u24, self.compression_methods.len);
+
+        return len;
+    }
 };
 
 const ClientHello = struct {
@@ -44,9 +54,8 @@ const ClientHello = struct {
             const compression_methods_length = self.readIntBig(u8, 1);
             const compression_methods = self.readSlice(compression_methods_length);
 
-            return .{
+            var handshake = ClientHelloHandshake{
                 .handshake_type = handshake_type,
-                .length = length,
                 .protocol_version = protocol_version,
                 .random = random,
                 .session_id_length = session_id_length,
@@ -56,6 +65,10 @@ const ClientHello = struct {
                 .compression_methods_length = compression_methods_length,
                 .compression_methods = compression_methods,
             };
+
+            std.debug.assert(handshake.length() == length);
+
+            return handshake;
         }
 
         fn readIntBig(self: *Decoder, comptime T: type, len: usize) T {
@@ -168,22 +181,22 @@ test "ClientHello" {
         compression_methods;
 
     var decoder = ClientHello.Decoder.init(raw);
-    const handshake = decoder.decode();
+    var handshake = decoder.decode();
 
-    try testing.expectEqual(handshake.handshake_type, .client_hello);
-    try testing.expectEqual(handshake.length, 45);
-    try testing.expectEqual(handshake.protocol_version, 0x0303);
-    try testing.expectEqual(handshake.random, 0x00);
-    try testing.expectEqual(handshake.session_id_length, 32);
-    try testing.expectEqualSlices(u8, handshake.session_id, &[_]u8{0x00} ** 32);
-    try testing.expectEqual(handshake.cipher_suites_length, 2);
-    try testing.expectEqualSlices(u8, handshake.cipher_suites, &[_]u8{ 0x00, 0x9c });
-    try testing.expectEqual(handshake.compression_methods_length, 1);
-    try testing.expectEqualSlices(u8, handshake.compression_methods, &[_]u8{0x00});
+    try testing.expectEqual(HandshakeType.client_hello, handshake.handshake_type);
+    try testing.expectEqual(@as(u24, 45), handshake.length());
+    try testing.expectEqual(@as(u16, 0x0303), handshake.protocol_version);
+    try testing.expectEqual(@as(u32, 0x00), handshake.random);
+    try testing.expectEqual(@as(u8, 32), handshake.session_id_length);
+    try testing.expectEqualSlices(u8, &[_]u8{0x00} ** 32, handshake.session_id);
+    try testing.expectEqual(@as(u16, 2), handshake.cipher_suites_length);
+    try testing.expectEqualSlices(u8, &[_]u8{ 0x00, 0x9c }, handshake.cipher_suites);
+    try testing.expectEqual(@as(u8, 1), handshake.compression_methods_length);
+    try testing.expectEqualSlices(u8, &[_]u8{0x00}, handshake.compression_methods);
 
     var encoder = ClientHello.Encoder.init(testing.allocator, handshake);
     defer encoder.deinit();
     const encoded = try encoder.encode();
 
-    try testing.expectEqualSlices(u8, encoded, raw);
+    try testing.expectEqualSlices(u8, raw, encoded);
 }
