@@ -10,7 +10,7 @@ pub const ClientHelloHandshake = struct {
 
     handshake_type: HandshakeType,
     protocol_version: u16,
-    random: u32,
+    random: []const u8,
     session_id_length: u8,
     session_id: []const u8,
     cipher_suites_length: u16,
@@ -21,7 +21,7 @@ pub const ClientHelloHandshake = struct {
     pub fn length(self: *ClientHelloHandshake) u24 {
         var len: u24 = 0;
 
-        len += (16 + 32 + 8 + 16 + 8) / 8;
+        len += (16 + 32 * 8 + 8 + 16 + 8) / 8;
         len += @intCast(u24, self.session_id.len);
         len += @intCast(u24, self.cipher_suites.len);
         len += @intCast(u24, self.compression_methods.len);
@@ -41,9 +41,7 @@ pub const ClientHelloHandshake = struct {
         std.mem.writeIntSlice(u16, &protocol_version_buf, self.protocol_version, .Big);
         try buf.appendSlice(protocol_version_buf[0..]);
         // random
-        var random_buf: [4]u8 = undefined;
-        std.mem.writeIntSlice(u32, &random_buf, self.random, .Big);
-        try buf.appendSlice(random_buf[0..]);
+        try buf.appendSlice(self.random[0..32]);
         // session_id
         try buf.append(self.session_id_length);
         try buf.appendSlice(self.session_id[0..self.session_id_length]);
@@ -80,7 +78,7 @@ pub const Decoder = struct {
         const handshake_type = @intToEnum(HandshakeType, self.readIntBig(u8, 1));
         const length = self.readIntBig(u24, 3);
         const protocol_version = self.readIntBig(u16, 2);
-        const random = self.readIntBig(u32, 4);
+        const random = self.readSlice(32);
         const session_id_length = self.readIntBig(u8, 1);
         const session_id = self.readSlice(session_id_length);
         const cipher_suites_length = self.readIntBig(u16, 2);
@@ -100,6 +98,7 @@ pub const Decoder = struct {
             .compression_methods = compression_methods,
         };
 
+        std.debug.print("0x{x}\n", .{handshake.length()});
         std.debug.assert(handshake.length() == length);
 
         return handshake;
@@ -127,14 +126,12 @@ test "ClientHello" {
         @enumToInt(HandshakeType.client_hello),
     };
     const length = &[_]u8{
-        0x00, 0x00, 0x2d,
+        0x00, 0x00, 0x49,
     };
     const protocol_version = &[_]u8{
         0x03, 0x03,
     };
-    const random = &[_]u8{
-        0x00, 0x00, 0x00, 0x00,
-    };
+    const random = &[_]u8{0x00} ** 0x20;
     const session_id_length = &[_]u8{
         0x20,
     };
@@ -167,9 +164,9 @@ test "ClientHello" {
     var handshake = decoder.decode();
 
     try testing.expectEqual(HandshakeType.client_hello, handshake.handshake_type);
-    try testing.expectEqual(@as(u24, 45), handshake.length());
+    try testing.expectEqual(@as(u24, 73), handshake.length());
     try testing.expectEqual(@as(u16, 0x0303), handshake.protocol_version);
-    try testing.expectEqual(@as(u32, 0x00), handshake.random);
+    try testing.expectEqualSlices(u8, &[_]u8{0x00} ** 32, handshake.random);
     try testing.expectEqual(@as(u8, 32), handshake.session_id_length);
     try testing.expectEqualSlices(u8, &[_]u8{0x00} ** 32, handshake.session_id);
     try testing.expectEqual(@as(u16, 2), handshake.cipher_suites_length);
