@@ -5,7 +5,7 @@ const HandshakeType = enum(u8) {
     client_hello = 1,
 };
 
-const ClientHelloHandshake = struct {
+pub const ClientHelloHandshake = struct {
     handshake_type: HandshakeType,
     protocol_version: u16,
     random: u32,
@@ -28,7 +28,7 @@ const ClientHelloHandshake = struct {
     }
 };
 
-const ClientHello = struct {
+pub const ClientHello = struct {
     const Self = @This();
 
     pub const Decoder = struct {
