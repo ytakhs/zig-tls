@@ -1,8 +1,8 @@
 const std = @import("std");
 const net = std.net;
-const client_hello = @import("./client_hello.zig");
+const handshake = @import("./handshake.zig");
 const record = @import("./record.zig");
-const ClientHelloHandshake = client_hello.ClientHelloHandshake;
+const ClientHelloHandshake = handshake.ClientHelloHandshake;
 
 pub fn main() anyerror!void {
     const targetAddr = try std.net.Address.parseIp4("127.0.0.1", 4433);
@@ -18,7 +18,7 @@ pub fn main() anyerror!void {
 }
 
 fn initRecord() record.HandshakeRecord {
-    const handshake = ClientHelloHandshake{
+    const hs = ClientHelloHandshake{
         .handshake_type = .client_hello,
         .protocol_version = 0x0303,
         .random = &[_]u8{0x00} ** 32,
@@ -30,10 +30,10 @@ fn initRecord() record.HandshakeRecord {
         .compression_methods = &[_]u8{0x00},
     };
 
-    return .{ .handshake = handshake };
+    return .{ .handshake = hs };
 }
 
 test "" {
-    _ = client_hello;
+    _ = handshake;
     _ = record;
 }

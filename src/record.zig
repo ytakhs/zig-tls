@@ -1,6 +1,6 @@
 const std = @import("std");
-const client_hello = @import("./client_hello.zig");
-const ClientHelloHandshake = client_hello.ClientHelloHandshake;
+const handshake = @import("./handshake.zig");
+const ClientHelloHandshake = handshake.ClientHelloHandshake;
 
 pub const HandshakeRecord = struct {
     const Self = @This();
